@@ -428,7 +428,7 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
     NSRectFill(rect);
 }
 
-// Bottom anchoring: YES on a vertical bar whose first drawn tab starts below the
+// YES on a vertical bar whose first drawn tab starts below the
 // inset band. The inset is then plain sidebar background and never reads as part
 // of the first tab, whatever treatLeftInsetAsPartOfFirstTab says.
 - (BOOL)firstTabIsAnchoredBelowInset {
@@ -524,7 +524,7 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
         const CGFloat right = MAX(NSMinX(cell.frame), [self leftMarginForTabBarControl]);
         return NSMakeRect(0, 0, right, cell.frame.size.height);
     } else {
-        // Bottom anchoring: when the first drawn tab starts below the inset band
+        // When the first drawn tab starts below the inset band
         // (the tab bar anchored its column at the bottom), the start inset covers
         // everything above it, so the vacated space reads as sidebar background
         // instead of the selected-tab base fill laid down by drawBackgroundInRect:.
@@ -570,7 +570,7 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
     }
 }
 
-// Bottom anchoring: the first cell that is actually drawn in the bar. A collapsed
+// The first cell that is actually drawn in the bar. A collapsed
 // group member carries a zero-size frame at a stale origin, so it must not decide
 // where the stack starts (mirrors the filter lastVisibleCell applies).
 - (PSMTabBarCell *)firstDrawnCell {
@@ -948,6 +948,12 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
 
     PSMTabBarCell *const cell = [self selectedCellInTabBarControl:bar];
     if (!cell || cell.isInOverflowMenu) {
+        return;
+    }
+    if (NSMaxY(cell.frame) >= NSHeight(bar.bounds) - 0.5) {
+        // The selected tab is flush with the bar's bottom edge (an anchored stack):
+        // there is nothing below it to separate, and a line here would read as a
+        // stray hairline along the window's bottom edge.
         return;
     }
     const CGFloat top = NSMaxY(cell.frame) - 0.5;

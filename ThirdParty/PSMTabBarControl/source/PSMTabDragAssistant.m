@@ -1648,8 +1648,8 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
         // Auto-scroll: shift the walk so the targeted drop slot is revealed.
         position -= _dragScrollNudge;
     }
-    const float startPosition = position;  // Bottom anchoring: the walk is measured from here.
-    CGFloat trailingSpacing = 0;            // Bottom anchoring: spacing the last laid-out cell added.
+    const float startPosition = position;  // The walk is measured from here.
+    CGFloat trailingSpacing = 0;            // Spacing the last laid-out cell added.
 
     // identify target cell
     // mouse at beginning of tabs
@@ -1927,7 +1927,7 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
             [[cell indicator] setFrame:[[control style] indicatorRectForTabCell:cell]];
     }
 
-    // Bottom anchoring: the walk above laid the column out from
+    // The walk above laid the column out from
     // the top margin. Shift every laid-out cell down by the offset the settled
     // layout uses for this content height, so an anchored stack stays put while
     // a tab is dragged instead of jumping to the top for the duration of the
@@ -1942,12 +1942,21 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
         // an upstream trait of the drag walk.)
         const CGFloat contentHeight = position - startPosition - trailingSpacing;
         const CGFloat topMargin = [[control style] topMarginForTabBarControl];
-        const CGFloat anchoredOrigin = [control verticalStartOriginForContentHeight:contentHeight];
+        CGFloat anchoredOrigin = [control verticalStartOriginForContentHeight:contentHeight];
         // Measure the shift from where the walk actually began (the top margin minus
         // the bar's scroll offset and any auto-scroll nudge), not from the bare
         // margin, so a scrolled bar that stops overflowing mid-drag lands anchored.
-        const CGFloat delta = (anchoredOrigin > topMargin) ? anchoredOrigin - startPosition : 0;
-        if (delta > 0) {
+        BOOL anchored = (anchoredOrigin > topMargin);
+        if (!anchored && contentHeight > 0 && [control anchoredScrollOffsetIsAtBottom]) {
+            // The column does not fit but the bar was stuck to the bottom before the
+            // drag: mirror the settled geometry (top margin minus the maximum offset)
+            // so a column within one tab of capacity does not snap to the top while
+            // a placeholder opens, then back when it closes.
+            anchoredOrigin = NSHeight([control frame]) - contentHeight;
+            anchored = YES;
+        }
+        const CGFloat delta = anchored ? anchoredOrigin - startPosition : 0;
+        if (delta != 0) {
             for (PSMTabBarCell *cell in cells) {
                 if ([cell isInOverflowMenu]) {
                     break;

@@ -365,7 +365,7 @@ typedef NS_ENUM(NSInteger, iTermTabBarFlashState) {
 
 - (void)advancedSettingsDidChange:(NSNotification *)notification {
     [self syncTabProgressBars];
-    // Bottom anchoring: apply the toggle to open windows.
+    // Apply the toggle to open windows.
     self.anchorsTabsAtBottomInVerticalOrientation = [iTermAdvancedSettingsModel anchorVerticalTabsAtBottom];
 }
 

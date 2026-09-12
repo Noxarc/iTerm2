@@ -243,7 +243,7 @@ extern const CGFloat PSMTabBarProgressBarHeight;
 @property(nonatomic, assign) BOOL allowsBackgroundTabClosing;
 @property(nonatomic, assign) BOOL allowsResizing;
 @property(nonatomic, assign) BOOL selectsTabsOnMouseDown;
-// Bottom anchoring: when YES and the bar is vertical, a fitting
+// When YES and the bar is vertical, a fitting
 // column of tabs stacks upward from the bottom edge instead of down from the top.
 @property(nonatomic, assign) BOOL anchorsTabsAtBottomInVerticalOrientation;
 @property(nonatomic, assign) BOOL automaticallyAnimates;
@@ -415,10 +415,13 @@ extern const CGFloat PSMTabBarProgressBarHeight;
                                     memberCount:(NSInteger)memberCount;
 // Height of a vertical group-chip cell (a one-row header band).
 - (CGFloat)heightOfTabGroupChipCell:(PSMTabBarCell *)cell;
-// Bottom anchoring: the origin a vertical column whose visible cells sum to
+// The origin a vertical column whose visible cells sum to
 // contentHeight starts at -- the style's top margin unless anchoring applies,
 // then (bar height - contentHeight).
 - (CGFloat)verticalStartOriginForContentHeight:(CGFloat)contentHeight;
+// YES when this scrollable vertical bar is anchored and its scroll offset sits at
+// the bottom of the last settled layout (the transcript-style stuck state).
+- (BOOL)anchoredScrollOffsetIsAtBottom;
 // Map an NSTabView index to the index of the corresponding tab cell in a
 // cell list that includes chip cells (returns cells.count if past the end).
 + (NSInteger)cellIndexForTabIndex:(NSInteger)tabIndex inCells:(NSArray<PSMTabBarCell *> *)cells;
