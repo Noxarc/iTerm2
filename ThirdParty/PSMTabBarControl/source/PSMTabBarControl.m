@@ -653,17 +653,37 @@ PSMTabBarControlOptionKey PSMTabBarControlOptionPUAFontProvider = @"PSMTabBarCon
     [self update];
 }
 
-// Bottom anchoring (homelab fork). Toggling relayouts immediately so the
+// Bottom anchoring. Toggling relayouts immediately so the
 // advanced setting applies to open windows without a restart.
 - (void)setAnchorsTabsAtBottomInVerticalOrientation:(BOOL)value {
     if (_anchorsTabsAtBottomInVerticalOrientation == value) {
         return;
     }
     _anchorsTabsAtBottomInVerticalOrientation = value;
-    [self update];
+    if (value) {
+        // An overflowing scrollable bar starts out stuck to the bottom.
+        _scrollOffset = [self maximumScrollOffset];
+    }
+    // Coalesced like setShowAddTabButton: -- this may run from a subclass
+    // initializer before the tab view, delegate and style exist.
+    [self setNeedsUpdate:YES];
 }
 
-// Bottom anchoring (homelab fork). The origin the first vertical cell starts at
+// Bottom anchoring: YES when anchoring applies to this (scrollable, vertical) bar
+// and the scroll offset sits at the bottom of the CURRENT content extent -- the
+// state a transcript-style bar preserves across content changes. Call it before
+// _scrollContentExtent is rewritten for the new layout.
+- (BOOL)anchoredScrollOffsetIsAtBottom {
+    if (!_anchorsTabsAtBottomInVerticalOrientation || _orientation != PSMTabBarVerticalOrientation) {
+        return NO;
+    }
+    if (![self tabBarIsScrollable]) {
+        return NO;
+    }
+    return _scrollOffset >= [self maximumScrollOffset] - 0.5;
+}
+
+// Bottom anchoring. The origin the first vertical cell starts at
 // for a column whose visible cells sum to contentHeight. Returns the style's top
 // margin -- the upstream geometry, unchanged -- unless anchoring is on, the bar
 // is vertical, and the whole column fits; then the walk starts at
@@ -753,7 +773,18 @@ PSMTabBarControlOptionKey PSMTabBarControlOptionPUAFontProvider = @"PSMTabBarCon
             return YES;
         }
         const CGFloat maxY = NSMaxY(lastCell.frame);
-        return point.y < maxY;
+        // Bottom anchoring: the free space can be ABOVE the stack, so bound the
+        // hit region at the first drawn cell as well. Upstream assumed tabs start
+        // at the top margin, which would turn the whole vacated area into a tab
+        // hit and kill window dragging from it.
+        CGFloat minY = self.insets.top;
+        for (PSMTabBarCell *cell in _cells) {
+            if ([self cellIsDrawnInBar:cell] && NSHeight(cell.frame) > 0) {
+                minY = MAX(minY, NSMinY(cell.frame));
+                break;
+            }
+        }
+        return point.y >= minY && point.y < maxY;
     }
 }
 
@@ -1857,11 +1888,19 @@ static NSString *PSMSmartTruncationPrefix(NSString *title, NSInteger length) {
                 }
                 totalHeight += cell.isTabGroupChip ? [self heightOfTabGroupChipCell:cell] : tabHeight;
             }
+            // Bottom anchoring: an anchored bar behaves like a transcript once the
+            // column overflows -- if the offset was at the bottom before this
+            // relayout, keep it at the (new) bottom so the newest tab stays flush
+            // with the bar's bottom edge; a user who scrolled up is left alone.
+            const BOOL stickToBottom = [self anchoredScrollOffsetIsAtBottom];
             _scrollContentExtent = [[self style] topMarginForTabBarControl] + totalHeight;
+            if (stickToBottom) {
+                _scrollOffset = [self maximumScrollOffset];
+            }
             [self clampScrollOffset];
-            // Bottom anchoring (homelab fork): a fitting column starts at the bottom;
-            // once it overflows the viewport the helper returns the top margin and
-            // the scroll geometry is exactly the upstream one.
+            // A fitting column starts at (bar height - content height); an
+            // overflowing one at (top margin - offset), which with the offset stuck
+            // at the bottom is the same value -- the two regimes meet without a jump.
             currentOrigin = [self verticalStartOriginForContentHeight:totalHeight] - _scrollOffset;
             for (int i = 0; i < cellCount; ++i) {
                 [newOrigins addObject:@(currentOrigin)];
@@ -1871,7 +1910,7 @@ static NSString *PSMSmartTruncationPrefix(NSString *title, NSInteger length) {
                 currentOrigin += _cells[i].isTabGroupChip ? [self heightOfTabGroupChipCell:_cells[i]] : tabHeight;
             }
         } else {
-            // Bottom anchoring (homelab fork): when every visible cell fits, start
+            // Bottom anchoring: when every visible cell fits, start
             // the walk so the stack ends flush with the bar's bottom edge. The helper
             // falls back to the top margin when anchoring is off or the content does
             // not fit, in which case the overflow logic below is the upstream one.
@@ -2269,11 +2308,17 @@ static CGFloat PSMCollapseEase(CGFloat t) {
     }
     // Track the interpolated content height so the scroll offset stays valid as
     // the column grows/shrinks under a scrolled vertical bar.
+    // Bottom anchoring: keep a bottom-stuck bar stuck while the column grows or
+    // shrinks under the animation (same rule as the settled scrollable layout).
+    const BOOL stickToBottom = [self anchoredScrollOffsetIsAtBottom];
     _scrollContentExtent = [[self style] topMarginForTabBarControl] + total;
+    if (stickToBottom) {
+        _scrollOffset = [self maximumScrollOffset];
+    }
     [self clampScrollOffset];
-    // Bottom anchoring (homelab fork): interpolate against the start origin the
-    // settled layout will use for this interpolated content height, so an
-    // anchored stack slides in place instead of jumping to the top mid-animation.
+    // Bottom anchoring: interpolate against the start origin the settled layout
+    // will use for this interpolated content height, so an anchored stack slides
+    // in place instead of jumping to the top mid-animation.
     CGFloat origin = [self verticalStartOriginForContentHeight:total] - _scrollOffset;
     for (NSInteger i = 0; i < n; i++) {
         const CGFloat slot = slots[i].doubleValue;

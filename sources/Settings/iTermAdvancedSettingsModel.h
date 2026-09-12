@@ -90,6 +90,7 @@ extern NSString *const iTermAdvancedSettingsDidChange;
 #if DEBUG
 + (NSString *)alternateSSHIntegrationScript;
 #endif
++ (BOOL)anchorVerticalTabsAtBottom;
 + (BOOL)animateGraphStatusBarComponents;
 + (BOOL)autoSearch;
 + (void)setAlternateMouseScroll:(BOOL)value;
@@ -440,7 +441,6 @@ extern NSString *const iTermAdvancedSettingsDidChange;
 + (NSString *)searchSuggestURL;
 + (void)setSearchSuggestURL:(NSString *)newValue;
 + (BOOL)selectsTabsOnMouseDown;
-+ (BOOL)anchorVerticalTabsAtBottom;  // homelab fork
 + (BOOL)sensitiveScrollWheel;
 + (BOOL)serializeOpeningMultipleFullScreenWindows;
 + (int)screenshotMaxPixelHeight;

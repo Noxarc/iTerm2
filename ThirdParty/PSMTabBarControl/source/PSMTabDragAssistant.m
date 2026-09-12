@@ -1648,7 +1648,7 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
         // Auto-scroll: shift the walk so the targeted drop slot is revealed.
         position -= _dragScrollNudge;
     }
-    const float startPosition = position;  // Bottom anchoring (homelab fork): the walk is measured from here.
+    const float startPosition = position;  // Bottom anchoring: the walk is measured from here.
 
     // identify target cell
     // mouse at beginning of tabs
@@ -1923,14 +1923,20 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
             [[cell indicator] setFrame:[[control style] indicatorRectForTabCell:cell]];
     }
 
-    // Bottom anchoring (homelab fork): the walk above laid the column out from
+    // Bottom anchoring: the walk above laid the column out from
     // the top margin. Shift every laid-out cell down by the offset the settled
     // layout uses for this content height, so an anchored stack stays put while
     // a tab is dragged instead of jumping to the top for the duration of the
     // drag. The offset is zero whenever anchoring is off, the bar is horizontal,
     // or the column does not fit -- the upstream drag geometry in every such case.
     if ([control orientation] == PSMTabBarVerticalOrientation) {
-        const CGFloat contentHeight = position - startPosition;
+        // The drag walk adds the style's intercell spacing after every real cell,
+        // the last one included; the settled layout adds none. Drop the trailing
+        // gap so the bottom cell stays flush with the bar's bottom edge.
+        CGFloat contentHeight = position - startPosition;
+        if (contentHeight > 0) {
+            contentHeight -= [[control style] intercellSpacing];
+        }
         const CGFloat delta = [control verticalStartOriginForContentHeight:contentHeight] -
                               [[control style] topMarginForTabBarControl];
         if (delta > 0) {

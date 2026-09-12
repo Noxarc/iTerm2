@@ -428,6 +428,18 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
     NSRectFill(rect);
 }
 
+// Bottom anchoring: YES on a vertical bar whose first drawn tab starts below the
+// inset band. The inset is then plain sidebar background and never reads as part
+// of the first tab, whatever treatLeftInsetAsPartOfFirstTab says.
+- (BOOL)firstTabIsAnchoredBelowInset {
+    PSMTabBarControl *bar = self.tabBar;
+    if (bar.orientation == PSMTabBarHorizontalOrientation) {
+        return NO;
+    }
+    PSMTabBarCell *first = self.firstVisibleCell;
+    return first != nil && NSMinY(first.frame) > bar.insets.top + 0.5;
+}
+
 - (BOOL)firstTabIsSelected {
     return self.firstVisibleCell.state == NSControlStateValueOn;
 }
@@ -443,7 +455,7 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
 
 - (void)drawStartInset {
     NSColor *color;
-    if (self.firstTabIsSelected && self.treatLeftInsetAsPartOfFirstTab) {
+    if (self.firstTabIsSelected && self.treatLeftInsetAsPartOfFirstTab && ![self firstTabIsAnchoredBelowInset]) {
         color = [self selectedTabColor];
     } else {
         color = [self nonSelectedTabColor];
@@ -512,7 +524,16 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
         const CGFloat right = MAX(NSMinX(cell.frame), [self leftMarginForTabBarControl]);
         return NSMakeRect(0, 0, right, cell.frame.size.height);
     } else {
-        return NSMakeRect(0, 0, NSWidth(self.tabBar.frame), self.tabBar.insets.top);
+        // Bottom anchoring: when the first drawn tab starts below the inset band
+        // (the tab bar anchored its column at the bottom), the start inset covers
+        // everything above it, so the vacated space reads as sidebar background
+        // instead of the selected-tab base fill laid down by drawBackgroundInRect:.
+        CGFloat bottom = self.tabBar.insets.top;
+        PSMTabBarCell *first = self.firstVisibleCell;
+        if (first) {
+            bottom = MAX(bottom, NSMinY(first.frame));
+        }
+        return NSMakeRect(0, 0, NSWidth(self.tabBar.frame), bottom);
     }
 }
 
@@ -874,14 +895,14 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
 #pragma mark Draw outline around vertical tab bar
 
 - (void)drawOutlineAroundVerticalTabBarWithOneTab:(PSMTabBarControl *)bar {
-    if (!self.treatLeftInsetAsPartOfFirstTab) {
+    if (!self.treatLeftInsetAsPartOfFirstTab || [self firstTabIsAnchoredBelowInset]) {
         [self drawOutlineAboveSelectedTabInVerticalTabBar:bar];
     }
     [self drawOutlineUnderSelectedTabInVerticalTabBar:bar];
 }
 
 - (void)drawOutlineAroundVerticalTabBarWithFirstTabSelected:(PSMTabBarControl *)bar {
-    if (!self.treatLeftInsetAsPartOfFirstTab) {
+    if (!self.treatLeftInsetAsPartOfFirstTab || [self firstTabIsAnchoredBelowInset]) {
         [self drawOutlineAboveSelectedTabInVerticalTabBar:bar];
     }
     [self drawOutlineUnderSelectedTabInVerticalTabBar:bar];
