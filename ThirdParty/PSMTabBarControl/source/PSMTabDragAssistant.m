@@ -1649,6 +1649,7 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
         position -= _dragScrollNudge;
     }
     const float startPosition = position;  // Bottom anchoring: the walk is measured from here.
+    CGFloat trailingSpacing = 0;            // Bottom anchoring: spacing the last laid-out cell added.
 
     // identify target cell
     // mouse at beginning of tabs
@@ -1912,11 +1913,14 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
         } else {
             newRect.origin.y = position;
             position += newRect.size.height;
+            CGFloat spacingAdded = 0;
             if (![cell isPlaceholder]) {
-                position += intercellSpacing;
+                spacingAdded = intercellSpacing;
             } else if (fullExtent > 0) {
-                position += intercellSpacing * MIN(1.0, newRect.size.height / fullExtent);
+                spacingAdded = intercellSpacing * MIN(1.0, newRect.size.height / fullExtent);
             }
+            position += spacingAdded;
+            trailingSpacing = spacingAdded;
         }
         [cell setFrame:newRect];
         if([cell indicator])
@@ -1930,15 +1934,19 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
     // drag. The offset is zero whenever anchoring is off, the bar is horizontal,
     // or the column does not fit -- the upstream drag geometry in every such case.
     if ([control orientation] == PSMTabBarVerticalOrientation) {
-        // The drag walk adds the style's intercell spacing after every real cell,
-        // the last one included; the settled layout adds none. Drop the trailing
-        // gap so the bottom cell stays flush with the bar's bottom edge.
-        CGFloat contentHeight = position - startPosition;
-        if (contentHeight > 0) {
-            contentHeight -= [[control style] intercellSpacing];
-        }
-        const CGFloat delta = [control verticalStartOriginForContentHeight:contentHeight] -
-                              [[control style] topMarginForTabBarControl];
+        // The drag walk adds the style's intercell spacing after each laid-out cell
+        // (a fraction of it after a placeholder); the settled layout adds none. Drop
+        // exactly the spacing the last cell contributed so the bottom cell stays
+        // flush with the bar's bottom edge. (Interior gaps remain: on styles with
+        // spacing the drag-time column is that much taller than the settled one,
+        // an upstream trait of the drag walk.)
+        const CGFloat contentHeight = position - startPosition - trailingSpacing;
+        const CGFloat topMargin = [[control style] topMarginForTabBarControl];
+        const CGFloat anchoredOrigin = [control verticalStartOriginForContentHeight:contentHeight];
+        // Measure the shift from where the walk actually began (the top margin minus
+        // the bar's scroll offset and any auto-scroll nudge), not from the bare
+        // margin, so a scrolled bar that stops overflowing mid-drag lands anchored.
+        const CGFloat delta = (anchoredOrigin > topMargin) ? anchoredOrigin - startPosition : 0;
         if (delta > 0) {
             for (PSMTabBarCell *cell in cells) {
                 if ([cell isInOverflowMenu]) {

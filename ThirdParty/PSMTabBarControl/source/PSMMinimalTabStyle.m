@@ -436,7 +436,7 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
     if (bar.orientation == PSMTabBarHorizontalOrientation) {
         return NO;
     }
-    PSMTabBarCell *first = self.firstVisibleCell;
+    PSMTabBarCell *first = [self firstDrawnCell];
     return first != nil && NSMinY(first.frame) > bar.insets.top + 0.5;
 }
 
@@ -529,7 +529,7 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
         // everything above it, so the vacated space reads as sidebar background
         // instead of the selected-tab base fill laid down by drawBackgroundInRect:.
         CGFloat bottom = self.tabBar.insets.top;
-        PSMTabBarCell *first = self.firstVisibleCell;
+        PSMTabBarCell *first = [self firstDrawnCell];
         if (first) {
             bottom = MAX(bottom, NSMinY(first.frame));
         }
@@ -568,6 +568,18 @@ static CGFloat PSMWeightedAverage(CGFloat l, CGFloat u, CGFloat w) {
                           NSWidth(cell.frame),
                           NSHeight(self.tabBar.frame) - NSMaxY(cell.frame));
     }
+}
+
+// Bottom anchoring: the first cell that is actually drawn in the bar. A collapsed
+// group member carries a zero-size frame at a stale origin, so it must not decide
+// where the stack starts (mirrors the filter lastVisibleCell applies).
+- (PSMTabBarCell *)firstDrawnCell {
+    for (PSMTabBarCell *cell in self.tabBar.cells) {
+        if (![cell isInOverflowMenu] && ![cell isCollapsedHidden]) {
+            return cell;
+        }
+    }
+    return nil;
 }
 
 - (PSMTabBarCell *)firstVisibleCell {

@@ -200,6 +200,11 @@ PSMTabBarControlOptionKey PSMTabBarControlOptionPUAFontProvider = @"PSMTabBarCon
     // End of the last layout walk along the scroll axis (leading margin + total tab extent), cached by
     // reallyUpdate: so maximumScrollOffset works with variable-width horizontal cells.
     CGFloat _scrollContentExtent;
+    // Bottom anchoring: the scroll viewport length the last VERTICAL layout used. The
+    // stick-to-bottom test compares the offset with the bottom of the PREVIOUS layout,
+    // and a frame change updates the viewport before that test runs, so the previous
+    // bottom has to be reconstructed from this cached length, not the live frame.
+    CGFloat _anchoredLastViewportLength;
 
     // When set, reallyUpdate: scrolls the selected tab into view after each layout. Set when a tab is
     // added or selected (its title, hence width, may settle over several layouts) and cleared when the
@@ -660,8 +665,9 @@ PSMTabBarControlOptionKey PSMTabBarControlOptionPUAFontProvider = @"PSMTabBarCon
         return;
     }
     _anchorsTabsAtBottomInVerticalOrientation = value;
-    if (value) {
-        // An overflowing scrollable bar starts out stuck to the bottom.
+    if (value && _orientation == PSMTabBarVerticalOrientation && [self tabBarIsScrollable]) {
+        // An overflowing scrollable vertical bar starts out stuck to the bottom. The
+        // offset is the x offset on a horizontal bar, which this setting never touches.
         _scrollOffset = [self maximumScrollOffset];
     }
     // Coalesced like setShowAddTabButton: -- this may run from a subclass
@@ -680,7 +686,8 @@ PSMTabBarControlOptionKey PSMTabBarControlOptionPUAFontProvider = @"PSMTabBarCon
     if (![self tabBarIsScrollable]) {
         return NO;
     }
-    return _scrollOffset >= [self maximumScrollOffset] - 0.5;
+    const CGFloat previousMaximum = MAX(0, _scrollContentExtent - _anchoredLastViewportLength);
+    return _scrollOffset >= previousMaximum - 0.5;
 }
 
 // Bottom anchoring. The origin the first vertical cell starts at
@@ -1894,6 +1901,7 @@ static NSString *PSMSmartTruncationPrefix(NSString *title, NSInteger length) {
             // with the bar's bottom edge; a user who scrolled up is left alone.
             const BOOL stickToBottom = [self anchoredScrollOffsetIsAtBottom];
             _scrollContentExtent = [[self style] topMarginForTabBarControl] + totalHeight;
+            _anchoredLastViewportLength = [self scrollViewportLength];
             if (stickToBottom) {
                 _scrollOffset = [self maximumScrollOffset];
             }
@@ -2312,6 +2320,7 @@ static CGFloat PSMCollapseEase(CGFloat t) {
     // shrinks under the animation (same rule as the settled scrollable layout).
     const BOOL stickToBottom = [self anchoredScrollOffsetIsAtBottom];
     _scrollContentExtent = [[self style] topMarginForTabBarControl] + total;
+    _anchoredLastViewportLength = [self scrollViewportLength];
     if (stickToBottom) {
         _scrollOffset = [self maximumScrollOffset];
     }
