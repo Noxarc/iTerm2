@@ -440,6 +440,7 @@ extern NSString *const iTermAdvancedSettingsDidChange;
 + (NSString *)searchSuggestURL;
 + (void)setSearchSuggestURL:(NSString *)newValue;
 + (BOOL)selectsTabsOnMouseDown;
++ (BOOL)anchorVerticalTabsAtBottom;  // homelab fork
 + (BOOL)sensitiveScrollWheel;
 + (BOOL)serializeOpeningMultipleFullScreenWindows;
 + (int)screenshotMaxPixelHeight;

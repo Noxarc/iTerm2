@@ -56,6 +56,7 @@ typedef NS_ENUM(NSInteger, iTermTabBarFlashState) {
         }
         self.showAddTabButton = ![iTermAdvancedSettingsModel removeAddTabButton];
         self.selectsTabsOnMouseDown = [iTermAdvancedSettingsModel selectsTabsOnMouseDown];
+        self.anchorsTabsAtBottomInVerticalOrientation = [iTermAdvancedSettingsModel anchorVerticalTabsAtBottom];
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(advancedSettingsDidChange:)
                                                      name:iTermAdvancedSettingsDidChange
@@ -364,6 +365,8 @@ typedef NS_ENUM(NSInteger, iTermTabBarFlashState) {
 
 - (void)advancedSettingsDidChange:(NSNotification *)notification {
     [self syncTabProgressBars];
+    // Bottom anchoring (homelab fork): apply the toggle to open windows.
+    self.anchorsTabsAtBottomInVerticalOrientation = [iTermAdvancedSettingsModel anchorVerticalTabsAtBottom];
 }
 
 - (void)setFlashState:(iTermTabBarFlashState)flashState {

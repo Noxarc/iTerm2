@@ -653,6 +653,34 @@ PSMTabBarControlOptionKey PSMTabBarControlOptionPUAFontProvider = @"PSMTabBarCon
     [self update];
 }
 
+// Bottom anchoring (homelab fork). Toggling relayouts immediately so the
+// advanced setting applies to open windows without a restart.
+- (void)setAnchorsTabsAtBottomInVerticalOrientation:(BOOL)value {
+    if (_anchorsTabsAtBottomInVerticalOrientation == value) {
+        return;
+    }
+    _anchorsTabsAtBottomInVerticalOrientation = value;
+    [self update];
+}
+
+// Bottom anchoring (homelab fork). The origin the first vertical cell starts at
+// for a column whose visible cells sum to contentHeight. Returns the style's top
+// margin -- the upstream geometry, unchanged -- unless anchoring is on, the bar
+// is vertical, and the whole column fits; then the walk starts at
+// (bar height - content height) so the stack ends flush with the bottom edge.
+// Overflow and scrolling therefore keep their top-anchored layout untouched.
+- (CGFloat)verticalStartOriginForContentHeight:(CGFloat)contentHeight {
+    const CGFloat topMargin = [[self style] topMarginForTabBarControl];
+    if (!_anchorsTabsAtBottomInVerticalOrientation || _orientation != PSMTabBarVerticalOrientation) {
+        return topMargin;
+    }
+    const CGFloat barHeight = [self frame].size.height;
+    if (contentHeight <= 0 || topMargin + contentHeight >= barHeight) {
+        return topMargin;
+    }
+    return barHeight - contentHeight;
+}
+
 - (PSMRolloverButton *)addTabButton {
     return _addTabButton;
 }
@@ -1831,7 +1859,10 @@ static NSString *PSMSmartTruncationPrefix(NSString *title, NSInteger length) {
             }
             _scrollContentExtent = [[self style] topMarginForTabBarControl] + totalHeight;
             [self clampScrollOffset];
-            currentOrigin -= _scrollOffset;
+            // Bottom anchoring (homelab fork): a fitting column starts at the bottom;
+            // once it overflows the viewport the helper returns the top margin and
+            // the scroll geometry is exactly the upstream one.
+            currentOrigin = [self verticalStartOriginForContentHeight:totalHeight] - _scrollOffset;
             for (int i = 0; i < cellCount; ++i) {
                 [newOrigins addObject:@(currentOrigin)];
                 if (_cells[i].isCollapsedHidden) {
@@ -1840,6 +1871,19 @@ static NSString *PSMSmartTruncationPrefix(NSString *title, NSInteger length) {
                 currentOrigin += _cells[i].isTabGroupChip ? [self heightOfTabGroupChipCell:_cells[i]] : tabHeight;
             }
         } else {
+            // Bottom anchoring (homelab fork): when every visible cell fits, start
+            // the walk so the stack ends flush with the bar's bottom edge. The helper
+            // falls back to the top margin when anchoring is off or the content does
+            // not fit, in which case the overflow logic below is the upstream one.
+            CGFloat totalHeight = 0;
+            for (PSMTabBarCell *cell in _cells) {
+                if (cell.isCollapsedHidden) {
+                    continue;  // hidden by a collapsed group: no height
+                }
+                totalHeight += cell.isTabGroupChip ? [self heightOfTabGroupChipCell:cell] : tabHeight;
+            }
+            currentOrigin = [self verticalStartOriginForContentHeight:totalHeight];
+            const BOOL anchoredAtBottom = (currentOrigin > [[self style] topMarginForTabBarControl]);
             for (int i = 0; i < cellCount; ++i) {
                 if (_cells[i].isCollapsedHidden) {
                     // Zero height, index-aligned origin, never breaks the walk.
@@ -1847,7 +1891,10 @@ static NSString *PSMSmartTruncationPrefix(NSString *title, NSInteger length) {
                     continue;
                 }
                 const CGFloat h = _cells[i].isTabGroupChip ? [self heightOfTabGroupChipCell:_cells[i]] : tabHeight;
-                if (currentOrigin + h <= [self frame].size.height) {
+                // An anchored stack fits by construction; skipping the overflow test
+                // keeps floating-point drift in the summed heights from ever pushing
+                // the last cell into the overflow menu.
+                if (anchoredAtBottom || currentOrigin + h <= [self frame].size.height) {
                     [newOrigins addObject:@(currentOrigin)];
                     currentOrigin += h;
                 } else {
@@ -2224,7 +2271,10 @@ static CGFloat PSMCollapseEase(CGFloat t) {
     // the column grows/shrinks under a scrolled vertical bar.
     _scrollContentExtent = [[self style] topMarginForTabBarControl] + total;
     [self clampScrollOffset];
-    CGFloat origin = [[self style] topMarginForTabBarControl] - _scrollOffset;
+    // Bottom anchoring (homelab fork): interpolate against the start origin the
+    // settled layout will use for this interpolated content height, so an
+    // anchored stack slides in place instead of jumping to the top mid-animation.
+    CGFloat origin = [self verticalStartOriginForContentHeight:total] - _scrollOffset;
     for (NSInteger i = 0; i < n; i++) {
         const CGFloat slot = slots[i].doubleValue;
         // Advance by the full slot (matching the settled layout), but draw the

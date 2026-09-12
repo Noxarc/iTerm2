@@ -243,6 +243,13 @@ extern const CGFloat PSMTabBarProgressBarHeight;
 @property(nonatomic, assign) BOOL allowsBackgroundTabClosing;
 @property(nonatomic, assign) BOOL allowsResizing;
 @property(nonatomic, assign) BOOL selectsTabsOnMouseDown;
+// Bottom anchoring (homelab fork): when YES and the bar is vertical, a fitting
+// column of tabs stacks upward from the bottom edge instead of down from the top.
+@property(nonatomic, assign) BOOL anchorsTabsAtBottomInVerticalOrientation;
+// Bottom anchoring (homelab fork): the origin a vertical column whose visible
+// cells sum to contentHeight starts at -- the style's top margin unless
+// anchoring applies, then (bar height - contentHeight).
+- (CGFloat)verticalStartOriginForContentHeight:(CGFloat)contentHeight;
 @property(nonatomic, assign) BOOL automaticallyAnimates;
 @property(nonatomic, assign) int tabLocation;
 @property(nonatomic, assign) int minimumTabDragDistance;

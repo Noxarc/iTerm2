@@ -1648,6 +1648,7 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
         // Auto-scroll: shift the walk so the targeted drop slot is revealed.
         position -= _dragScrollNudge;
     }
+    const float startPosition = position;  // Bottom anchoring (homelab fork): the walk is measured from here.
 
     // identify target cell
     // mouse at beginning of tabs
@@ -1920,6 +1921,31 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
         [cell setFrame:newRect];
         if([cell indicator])
             [[cell indicator] setFrame:[[control style] indicatorRectForTabCell:cell]];
+    }
+
+    // Bottom anchoring (homelab fork): the walk above laid the column out from
+    // the top margin. Shift every laid-out cell down by the offset the settled
+    // layout uses for this content height, so an anchored stack stays put while
+    // a tab is dragged instead of jumping to the top for the duration of the
+    // drag. The offset is zero whenever anchoring is off, the bar is horizontal,
+    // or the column does not fit -- the upstream drag geometry in every such case.
+    if ([control orientation] == PSMTabBarVerticalOrientation) {
+        const CGFloat contentHeight = position - startPosition;
+        const CGFloat delta = [control verticalStartOriginForContentHeight:contentHeight] -
+                              [[control style] topMarginForTabBarControl];
+        if (delta > 0) {
+            for (PSMTabBarCell *cell in cells) {
+                if ([cell isInOverflowMenu]) {
+                    break;
+                }
+                NSRect shifted = [cell frame];
+                shifted.origin.y += delta;
+                [cell setFrame:shifted];
+                if ([cell indicator]) {
+                    [[cell indicator] setFrame:[[control style] indicatorRectForTabCell:cell]];
+                }
+            }
+        }
     }
 
 #if PSM_DEBUG_DRAG_PERFORMANCE
